@@ -1,5 +1,7 @@
+
 import flet as ft
 from home import Home
+from assetpage import AssetFormPage
 import sqlite3
 from asset import AssetPage
 from sync_server import initialize_local_db
@@ -87,4 +89,4 @@ def main(page: ft.Page):
     page.go("/")
 
 if __name__ == "__main__":
-    ft.app(target=main)  # Removed upload_dir="Upload
+    ft.app(target=main)
