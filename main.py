@@ -87,4 +87,4 @@ def main(page: ft.Page):
     page.go("/")
 
 if __name__ == "__main__":
-    ft.app(target=main)  # Removed upload_dir="Uploads"
+    ft.app(target=main)  # Removed upload_dir="Upload
