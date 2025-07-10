@@ -1,231 +1,8 @@
-# import os
-# os.environ["FLET_SECRET_KEY"] = "mysecret123"
-# import flet as ft
-# import sqlite3
-# import base64
-# import time
-# from pathlib import Path
-# from sync_server import initialize_local_db
-
-# class AssetEditPage:
-#     def __init__(self, page: ft.Page, parent=None, asset_id=None, local_db=None):
-#         if page is None:
-#             raise ValueError("Page object must be provided to AssetEditPage")
-#         self.page = page
-#         self.parent = parent
-#         self.asset_id = asset_id
-
-#         # ✅ Use Path.home() for Android-safe writable directory
-#         db_path = os.path.join(str(Path.home()), "assets.db")
-#         print(f"DB path: {db_path}, writable: {os.access(db_path, os.W_OK)}")
-#         self.local_db = local_db or sqlite3.connect(db_path, check_same_thread=False)
-#         initialize_local_db(self.local_db)
-
-#         # ✅ TEMP dir also under writable home
-#         self.TEMP_DIR = os.path.join(str(Path.home()), "temp")
-#         os.makedirs(self.TEMP_DIR, exist_ok=True)
-#         print(f"Initialized TEMP_DIR: {self.TEMP_DIR}, writable: {os.access(self.TEMP_DIR, os.W_OK)}")
-
-#         self.error_popup = ft.AlertDialog(title=ft.Text("Error"), content=ft.Text(""), actions=[ft.TextButton("OK", on_click=self.close_error_popup)])
-#         self.success_popup = ft.AlertDialog(title=ft.Text("Success"), content=ft.Text(""), actions=[ft.TextButton("OK", on_click=self.close_success_popup)])
-
-#         self.asset_model = ft.TextField(label="Model", hint_text="Model", icon=ft.Icons.DEVICE_HUB, disabled=True)
-#         self.asset_serial_number = ft.TextField(label="Serial Number", hint_text="Serial Number", icon=ft.Icons.DEVICE_HUB, disabled=True)
-#         self.asset_location = ft.TextField(label="Location", hint_text="Location", icon=ft.Icons.LOCATION_ON)
-
-#         self.asset_image = ft.FilePicker(on_result=self.handle_asset_image)
-#         self.asset_image_button = ft.ElevatedButton("Select Image", icon=ft.Icons.IMAGE, on_click=lambda e: self.asset_image.pick_files(allow_multiple=False, allowed_extensions=["jpg", "jpeg", "png"]))
-#         self.warning_text = ft.Text("", color="red")
-
-#         self.asset_bill = ft.FilePicker(on_result=self.handle_bill_image)
-#         self.asset_bill_button = ft.ElevatedButton("Upload Bill", icon=ft.Icons.ATTACH_FILE, on_click=lambda e: self.asset_bill.pick_files(allow_multiple=False, allowed_extensions=["jpg", "jpeg", "png"]))
-#         self.bill_warning_text = ft.Text("", color="red")
-
-#         self.attached_images = []
-#         self.attached_bills = []
-
-#         self.dialog = ft.AlertDialog(
-#             modal=True, bgcolor=ft.Colors.YELLOW_100, title=ft.Text("Edit Asset"),
-#             content=ft.Container(width=400, height=500, content=ft.Column(controls=[
-#                 self.asset_model, self.asset_serial_number, self.asset_location,
-#                 self.asset_image_button, self.warning_text,
-#                 self.asset_bill_button, self.bill_warning_text
-#             ], spacing=15, scroll=ft.ScrollMode.AUTO), padding=20),
-#             actions=[ft.TextButton("Cancel", on_click=self.close_dialog), ft.TextButton("Save", on_click=self.save_asset)],
-#             actions_alignment=ft.MainAxisAlignment.END)
-
-#         self.page.overlay.extend([self.error_popup, self.success_popup, self.asset_image, self.asset_bill, self.dialog])
-#         self.page.secret_key = "mysecret123"
-
-#         if self.asset_id:
-#             self.load_asset_data()
-
-#     def open_dialog(self):
-#         if self.asset_id:
-#             self.load_asset_data()
-#             self.dialog.open = True
-#             self.page.update()
-
-#     def load_asset_data(self):
-#         if not self.asset_id:
-#             self.error_popup.content = ft.Text("No asset ID provided for editing.")
-#             self.error_popup.open = True
-#             return
-#         cursor = self.local_db.cursor()
-#         try:
-#             cursor.execute("SELECT model, serial_number, location FROM assets WHERE id = ?", (self.asset_id,))
-#             asset = cursor.fetchone()
-#             if asset:
-#                 self.asset_model.value = asset[0] or ""
-#                 self.asset_serial_number.value = asset[1] or ""
-#                 self.asset_location.value = asset[2] or ""
-#             else:
-#                 self.error_popup.content = ft.Text(f"Asset with ID {self.asset_id} not found.")
-#                 self.error_popup.open = True
-#             self.page.update()
-#         except Exception as e:
-#             self.error_popup.content = ft.Text(f"Error loading asset: {e}")
-#             self.error_popup.open = True
-#         finally:
-#             cursor.close()
-
-#     def handle_asset_image(self, e: ft.FilePickerResultEvent):
-#         self.attached_images = e.files if e.files else []
-#         self.asset_image_button.text = f"{len(self.attached_images)} image(s) selected."
-#         self.warning_text.value = ""
-#         if self.attached_images:
-#             file = self.attached_images[0]
-#             try:
-#                 if file.path and os.path.exists(file.path):
-#                     with open(file.path, "rb") as f:
-#                         self.attached_image_bytes = f.read()
-#                     print(f"Image bytes length: {len(self.attached_image_bytes)}")
-#                     self.warning_text.value = "Image selected successfully."
-#                 else:
-#                     self.warning_text.value = "Failed to access image file."
-#             except Exception as ex:
-#                 self.warning_text.value = f"Error reading image: {ex}"
-#         self.warning_text.update()
-#         self.page.update()
-
-#     def handle_bill_image(self, e: ft.FilePickerResultEvent):
-#         self.attached_bills = e.files if e.files else []
-#         self.asset_bill_button.text = f"{len(self.attached_bills)} bill(s) selected."
-#         self.bill_warning_text.value = ""
-#         if self.attached_bills:
-#             file = self.attached_bills[0]
-#             try:
-#                 if file.path and os.path.exists(file.path):
-#                     with open(file.path, "rb") as f:
-#                         self.attached_bill_bytes = f.read()
-#                     print(f"Bill bytes length: {len(self.attached_bill_bytes)}")
-#                     self.bill_warning_text.value = "Bill selected successfully."
-#                 else:
-#                     self.bill_warning_text.value = "Failed to access bill file."
-#             except Exception as ex:
-#                 self.bill_warning_text.value = f"Error reading bill: {ex}"
-#         self.bill_warning_text.update()
-#         self.page.update()
-
-#     def save_asset(self, event):
-#         if not self.asset_id:
-#             self.error_popup.content = ft.Text("No asset selected for editing.")
-#             self.error_popup.open = True
-#             self.page.update()
-#             return
-
-#         cursor = self.local_db.cursor()
-#         try:
-#             cursor.execute("BEGIN TRANSACTION")
-#             cursor.execute("UPDATE assets SET location = ? WHERE id = ?", (self.asset_location.value or "", self.asset_id))
-#             print(f"Updated location for asset_id {self.asset_id} to {self.asset_location.value}")
-
-#             if self.attached_images and hasattr(self, 'attached_image_bytes'):
-#                 img_name = os.path.basename(self.attached_images[0].name)
-#                 cursor.execute("SELECT id FROM asset_images WHERE asset_id = ? LIMIT 1", (self.asset_id,))
-#                 existing_image = cursor.fetchone()
-#                 if existing_image:
-#                     image_id = existing_image[0]
-#                     cursor.execute("""
-#                         UPDATE asset_images SET image_data = ?, image_name = ?, last_sync = ? WHERE id = ?
-#                     """, (self.attached_image_bytes, img_name, time.strftime("%Y-%m-%d %H:%M:%S"), image_id))
-#                 else:
-#                     cursor.execute("""
-#                         INSERT INTO asset_images (asset_id, image_name, image_data, last_sync)
-#                         VALUES (?, ?, ?, ?)
-#                     """, (self.asset_id, img_name, self.attached_image_bytes, time.strftime("%Y-%m-%d %H:%M:%S")))
-
-#                 # Verify image saved
-#                 cursor.execute("SELECT LENGTH(image_data) FROM asset_images WHERE asset_id = ?", (self.asset_id,))
-#                 stored = cursor.fetchone()
-#                 print(f"Stored image size: {stored[0] if stored else 'None'}")
-
-#             if self.attached_bills and hasattr(self, 'attached_bill_bytes'):
-#                 bill_name = os.path.basename(self.attached_bills[0].name)
-#                 cursor.execute("SELECT id FROM asset_bills WHERE asset_id = ? LIMIT 1", (self.asset_id,))
-#                 existing_bill = cursor.fetchone()
-#                 if existing_bill:
-#                     bill_id = existing_bill[0]
-#                     cursor.execute("""
-#                         UPDATE asset_bills SET bill_data = ?, bill_name = ?, last_sync = ? WHERE id = ?
-#                     """, (self.attached_bill_bytes, bill_name, time.strftime("%Y-%m-%d %H:%M:%S"), bill_id))
-#                 else:
-#                     cursor.execute("""
-#                         INSERT INTO asset_bills (asset_id, bill_name, bill_data, last_sync)
-#                         VALUES (?, ?, ?, ?)
-#                     """, (self.asset_id, bill_name, self.attached_bill_bytes, time.strftime("%Y-%m-%d %H:%M:%S")))
-
-#             self.local_db.commit()
-#             self.success_popup.content = ft.Text("Asset updated locally!")
-#             self.success_popup.open = True
-#             self.page.update()
-
-#         except Exception as e:
-#             self.local_db.rollback()
-#             self.error_popup.content = ft.Text(f"Error updating asset: {e}")
-#             self.error_popup.open = True
-#             print(f"Save failed: {e}")
-#         finally:
-#             cursor.close()
-#             self.dialog.open = False
-#             self.page.update()
-
-#     def close_dialog(self, event):
-#         self.dialog.open = False
-#         self.attached_images = []
-#         self.attached_bills = []
-#         self.asset_image_button.text = "Select Image"
-#         self.asset_bill_button.text = "Upload Bill"
-#         self.warning_text.value = ""
-#         self.bill_warning_text.value = ""
-#         self.close_success_popup(event)
-#         self.page.update()
-
-#     def close_error_popup(self, event):
-#         self.error_popup.open = False
-#         self.dialog.open = False
-#         self.page.update()
-
-#     def close_success_popup(self, event):
-#         self.success_popup.open = False
-#         self.dialog.open = False
-#         self.attached_images = []
-#         self.attached_bills = []
-#         self.asset_image_button.text = "Select Image"
-#         self.asset_bill_button.text = "Upload Bill"
-#         self.warning_text.value = ""
-#         self.bill_warning_text.value = ""
-#         if self.parent and hasattr(self.parent, 'refresh_local_assets'):
-#             self.parent.refresh_local_assets()
-#         self.page.update()
-
-
 
 import os
 os.environ["FLET_SECRET_KEY"] = "mysecret123"
 import flet as ft
 import sqlite3
-import base64
 import time
 from pathlib import Path
 from sync_server import initialize_local_db
@@ -239,13 +16,8 @@ class AssetEditPage:
         self.asset_id = asset_id
 
         db_path = os.path.join(str(Path.home()), "assets.db")
-        print(f"DB path: {db_path}, writable: {os.access(db_path, os.W_OK)}")
         self.local_db = local_db or sqlite3.connect(db_path, check_same_thread=False)
         initialize_local_db(self.local_db)
-
-        self.TEMP_DIR = os.path.join(str(Path.home()), "temp")
-        os.makedirs(self.TEMP_DIR, exist_ok=True)
-        print(f"Initialized TEMP_DIR: {self.TEMP_DIR}, writable: {os.access(self.TEMP_DIR, os.W_OK)}")
 
         self.error_popup = ft.AlertDialog(title=ft.Text("Error"), content=ft.Text(""), actions=[ft.TextButton("OK", on_click=self.close_error_popup)])
         self.success_popup = ft.AlertDialog(title=ft.Text("Success"), content=ft.Text(""), actions=[ft.TextButton("OK", on_click=self.close_success_popup)])
@@ -254,20 +26,14 @@ class AssetEditPage:
         self.asset_serial_number = ft.TextField(label="Serial Number", hint_text="Serial Number", icon=ft.Icons.DEVICE_HUB, disabled=True)
         self.asset_location = ft.TextField(label="Location", hint_text="Location", icon=ft.Icons.LOCATION_ON)
 
-        self.asset_image = ft.FilePicker(on_result=self.handle_asset_image)
-        self.asset_image_button = ft.ElevatedButton("Select Image", icon=ft.Icons.IMAGE, on_click=lambda e: self.asset_image.pick_files(allow_multiple=False, allowed_extensions=["jpg", "jpeg", "png"]))
+        self.asset_image_button = ft.ElevatedButton("Select Image", icon=ft.Icons.IMAGE)
+        self.asset_bill_button = ft.ElevatedButton("Upload Bill", icon=ft.Icons.ATTACH_FILE)
         self.warning_text = ft.Text("", color="red")
-
-        self.asset_bill = ft.FilePicker(on_result=self.handle_bill_image)
-        self.asset_bill_button = ft.ElevatedButton("Upload Bill", icon=ft.Icons.ATTACH_FILE, on_click=lambda e: self.asset_bill.pick_files(allow_multiple=False, allowed_extensions=["jpg", "jpeg", "png"]))
         self.bill_warning_text = ft.Text("", color="red")
-
-        self.attached_images = []
-        self.attached_bills = []
 
         self.dialog = ft.AlertDialog(
             modal=True, bgcolor=ft.Colors.YELLOW_100, title=ft.Text("Edit Asset"),
-            content=ft.Container(width=400, height=600, content=ft.Column(controls=[
+            content=ft.Container(width=400, height=500, content=ft.Column(controls=[
                 self.asset_model, self.asset_serial_number, self.asset_location,
                 self.asset_image_button, self.warning_text,
                 self.asset_bill_button, self.bill_warning_text
@@ -275,7 +41,7 @@ class AssetEditPage:
             actions=[ft.TextButton("Cancel", on_click=self.close_dialog), ft.TextButton("Save", on_click=self.save_asset)],
             actions_alignment=ft.MainAxisAlignment.END)
 
-        self.page.overlay.extend([self.error_popup, self.success_popup, self.asset_image, self.asset_bill, self.dialog])
+        self.page.overlay.extend([self.error_popup, self.success_popup, self.dialog])
         self.page.secret_key = "mysecret123"
 
         if self.asset_id:
@@ -284,7 +50,6 @@ class AssetEditPage:
     def open_dialog(self):
         if self.asset_id:
             self.load_asset_data()
-            self.load_and_display_asset_image()
             self.dialog.open = True
             self.page.update()
 
@@ -307,67 +72,6 @@ class AssetEditPage:
         finally:
             cursor.close()
 
-    def load_and_display_asset_image(self):
-        cursor = self.local_db.cursor()
-        try:
-            cursor.execute("SELECT image_data, image_name FROM asset_images WHERE asset_id = ?", (self.asset_id,))
-            row = cursor.fetchone()
-            if row:
-                image_bytes, image_name = row
-                base64_str = base64.b64encode(image_bytes).decode('utf-8')
-                image = ft.Image(
-                    src_base64=base64_str,
-                    width=200,
-                    height=200,
-                    fit=ft.ImageFit.CONTAIN,
-                    tooltip=f"{image_name}"
-                )
-                self.dialog.content.controls.controls = [
-                    ctrl for ctrl in self.dialog.content.controls.controls if not isinstance(ctrl, ft.Image)
-                ]
-                self.dialog.content.controls.controls.insert(3, image)
-                self.page.update()
-        except Exception as e:
-            print(f"Failed to load image: {e}")
-        finally:
-            cursor.close()
-
-    def handle_asset_image(self, e: ft.FilePickerResultEvent):
-        self.attached_images = e.files if e.files else []
-        self.asset_image_button.text = f"{len(self.attached_images)} image(s) selected."
-        self.warning_text.value = ""
-        if self.attached_images:
-            file = self.attached_images[0]
-            try:
-                if file.path and os.path.exists(file.path):
-                    with open(file.path, "rb") as f:
-                        self.attached_image_bytes = f.read()
-                    self.warning_text.value = "Image selected successfully."
-                else:
-                    self.warning_text.value = "Failed to access image file."
-            except Exception as ex:
-                self.warning_text.value = f"Error reading image: {ex}"
-        self.warning_text.update()
-        self.page.update()
-
-    def handle_bill_image(self, e: ft.FilePickerResultEvent):
-        self.attached_bills = e.files if e.files else []
-        self.asset_bill_button.text = f"{len(self.attached_bills)} bill(s) selected."
-        self.bill_warning_text.value = ""
-        if self.attached_bills:
-            file = self.attached_bills[0]
-            try:
-                if file.path and os.path.exists(file.path):
-                    with open(file.path, "rb") as f:
-                        self.attached_bill_bytes = f.read()
-                    self.bill_warning_text.value = "Bill selected successfully."
-                else:
-                    self.bill_warning_text.value = "Failed to access bill file."
-            except Exception as ex:
-                self.bill_warning_text.value = f"Error reading bill: {ex}"
-        self.bill_warning_text.update()
-        self.page.update()
-
     def save_asset(self, event):
         if not self.asset_id:
             self.error_popup.content = ft.Text("No asset selected for editing.")
@@ -379,42 +83,10 @@ class AssetEditPage:
         try:
             cursor.execute("BEGIN TRANSACTION")
             cursor.execute("UPDATE assets SET location = ? WHERE id = ?", (self.asset_location.value or "", self.asset_id))
-
-            if self.attached_images and hasattr(self, 'attached_image_bytes'):
-                img_name = os.path.basename(self.attached_images[0].name)
-                cursor.execute("SELECT id FROM asset_images WHERE asset_id = ? LIMIT 1", (self.asset_id,))
-                existing_image = cursor.fetchone()
-                if existing_image:
-                    image_id = existing_image[0]
-                    cursor.execute("""
-                        UPDATE asset_images SET image_data = ?, image_name = ?, last_sync = ? WHERE id = ?
-                    """, (self.attached_image_bytes, img_name, time.strftime("%Y-%m-%d %H:%M:%S"), image_id))
-                else:
-                    cursor.execute("""
-                        INSERT INTO asset_images (asset_id, image_name, image_data, last_sync)
-                        VALUES (?, ?, ?, ?)
-                    """, (self.asset_id, img_name, self.attached_image_bytes, time.strftime("%Y-%m-%d %H:%M:%S")))
-
-            if self.attached_bills and hasattr(self, 'attached_bill_bytes'):
-                bill_name = os.path.basename(self.attached_bills[0].name)
-                cursor.execute("SELECT id FROM asset_bills WHERE asset_id = ? LIMIT 1", (self.asset_id,))
-                existing_bill = cursor.fetchone()
-                if existing_bill:
-                    bill_id = existing_bill[0]
-                    cursor.execute("""
-                        UPDATE asset_bills SET bill_data = ?, bill_name = ?, last_sync = ? WHERE id = ?
-                    """, (self.attached_bill_bytes, bill_name, time.strftime("%Y-%m-%d %H:%M:%S"), bill_id))
-                else:
-                    cursor.execute("""
-                        INSERT INTO asset_bills (asset_id, bill_name, bill_data, last_sync)
-                        VALUES (?, ?, ?, ?)
-                    """, (self.asset_id, bill_name, self.attached_bill_bytes, time.strftime("%Y-%m-%d %H:%M:%S")))
-
             self.local_db.commit()
             self.success_popup.content = ft.Text("Asset updated locally!")
             self.success_popup.open = True
             self.page.update()
-
         except Exception as e:
             self.local_db.rollback()
             self.error_popup.content = ft.Text(f"Error updating asset: {e}")
@@ -426,8 +98,6 @@ class AssetEditPage:
 
     def close_dialog(self, event):
         self.dialog.open = False
-        self.attached_images = []
-        self.attached_bills = []
         self.asset_image_button.text = "Select Image"
         self.asset_bill_button.text = "Upload Bill"
         self.warning_text.value = ""
@@ -443,8 +113,6 @@ class AssetEditPage:
     def close_success_popup(self, event):
         self.success_popup.open = False
         self.dialog.open = False
-        self.attached_images = []
-        self.attached_bills = []
         self.asset_image_button.text = "Select Image"
         self.asset_bill_button.text = "Upload Bill"
         self.warning_text.value = ""
