@@ -1,5 +1,3 @@
-
-
 import mysql.connector
 import flet as ft
 from mysql.connector import Error
