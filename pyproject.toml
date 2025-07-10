@@ -7,7 +7,7 @@ authors = [
 ]
 dependencies = [
   "flet==0.28.3",
-  "mysql-connector-python>=8.0.0"  # Added for sync_server.py
+  "mysql-connector-python"  # Added for sync_server.py
 ]
 
 [tool.flet]
