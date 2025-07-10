@@ -1,3 +1,4 @@
+
 import os
 import flet as ft
 import sqlite3
@@ -19,7 +20,7 @@ class AssetPage(ft.Container):
         self.page.theme_mode = ft.ThemeMode.LIGHT
         self.page.bgcolor = ft.Colors.WHITE
 
-        self.local_db = sqlite3.connect(os.path.join(os.getcwd(), "assets.db"), check_same_thread=False)
+        self.local_db = sqlite3.connect("assets.db", check_same_thread=False)
         initialize_local_db(self.local_db)
         
         self.add_asset_dialog = AssetFormPage(self.page, self, local_db=self.local_db)
